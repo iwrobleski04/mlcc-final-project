@@ -90,4 +90,4 @@ if __name__ == "__main__":
 
     path = "data/caml_satellite_matchup.csv"
     df = load_clean_data(path)
-    print(df.info())
+    df.to_csv("data/caml_satellite_matchup_clean.csv")
