@@ -14,8 +14,8 @@ def extract_satellite_data(feature):
     # get water sample location
     geom = feature.geometry()
     coords = geom.coordinates()
-    lat = coords.get(0)
-    lon = coords.get(1)
+    lat = coords.get(1)
+    lon = coords.get(0)
 
     # create date window
     start = sample_date.advance(-5, "day")
