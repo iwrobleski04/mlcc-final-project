@@ -235,10 +235,11 @@ def normalize_units(row):
     # otherwise return none
     return None
 
-def match_wqp(existing_df_path, nutrient_df_path):
+def match_wqp(existing_df_path, nutrient_df_path, date="sample"):
     """
     match wqp nutrient data with dates in the existing dataset
     """
+
     # load data
     df = pd.read_csv(existing_df_path)
     nutrients = pd.read_csv(nutrient_df_path)
@@ -303,13 +304,20 @@ def match_wqp(existing_df_path, nutrient_df_path):
         how='left'
     )
 
+    if date == "satellite":
+        date_col = "satellite_date"
+        days_diff_col = "days_diff_sat_to_nutrients"
+    else:
+        date_col = "caml_sample_date"
+        days_diff_col = "days_diff_caml_to_nutrients"
+
     # calculate time difference between nutrient sample and satellite
-    merged['caml_sample_date'] = pd.to_datetime(merged['caml_sample_date'])
+    merged[date_col] = pd.to_datetime(merged[date_col])
     merged['ActivityStartDate'] = pd.to_datetime(merged['ActivityStartDate'])
-    merged['days_diff_caml_to_nutrients'] = (merged['caml_sample_date'] - merged['ActivityStartDate']).dt.days.abs()
+    merged[days_diff_col] = (merged[date_col] - merged['ActivityStartDate']).dt.days.abs()
 
     nutrient_cols = ['TP_mgL', 'TN_mgL', 'DIN_mgL', 'OrthoP_mgL', 'ActivityStartDate']
-    mask = merged['days_diff_caml_to_nutrients'] > 14
+    mask = merged[days_diff_col] > 14
     merged.loc[mask, nutrient_cols] = np.nan
 
     # filter for a 14-day window
@@ -320,17 +328,17 @@ def match_wqp(existing_df_path, nutrient_df_path):
     merged["TN_mgL"] = merged["TN_mgL"].fillna(merged["DIN_mgL"])
 
     # rename columns
-    merged.drop(columns={"DIN_mgL", "OrthoP_mgL", "Unnamed: 0", "lat_round", "lon_round", "query_lat", "query_lon"}, inplace=True)
+    merged.drop(columns={"DIN_mgL", "OrthoP_mgL", "lat_round", "lon_round", "query_lat", "query_lon"}, inplace=True)
     merged = merged.rename(columns={"ActivityStartDate": "nutrients_date"})
 
     # for each unique satellite image, drop all nutrient rows except the best one (least days difference)
-    final_df = merged.sort_values('days_diff_caml_to_nutrients', ascending=True).drop_duplicates(
-        subset=['latitude', 'longitude', 'caml_sample_date'], 
+    final_df = merged.sort_values(days_diff_col, ascending=True).drop_duplicates(
+        subset=['latitude', 'longitude', date_col], 
         keep='first'
     )
 
     # save data
-    final_df.to_csv("data/nutrients_matchup_test.csv", index=False)
+    final_df.to_csv("data/nutrients_matchup_timeseries.csv", index=False)
 
 def match_nasa(existing_df_path):
     """
@@ -407,4 +415,6 @@ def match_nasa(existing_df_path):
 
 if __name__ == "__main__":
     
-    match_wqp("data/caml_nasa_satellite.csv", "data/nutrients.csv")
+    match_wqp("before_30_7.csv", "data/nutrients.csv", date="satellite")
+    df = pd.read_csv("data/nutrients_matchup_timeseries.csv")
+    print(df.info())
