@@ -33,7 +33,7 @@ def thin_points(date_group: pd.DataFrame, area: int) -> pd.DataFrame:
     
     return temp_group.iloc[keep_indices].copy()
 
-def load_clean_data(path: str, data_type: str = "train") -> pd.DataFrame:
+def load_clean_data(path: str) -> pd.DataFrame:
 
     # load data
     try:
@@ -41,9 +41,6 @@ def load_clean_data(path: str, data_type: str = "train") -> pd.DataFrame:
     except Exception as e:
         print(f"data loading unsuccessful: {e}")
         return
-
-    if data_type == "test":
-        df = df.rename(columns={"total cells/ml": "cyanobacteria_abundance"})
 
     print("rows pre-cleaning:", df.shape[0])
 
@@ -61,14 +58,13 @@ def load_clean_data(path: str, data_type: str = "train") -> pd.DataFrame:
     df.drop(columns=["system:index", ".geo"], inplace=True)
 
     # thin data by keeping 1 point for each 50m area on the same day
-    if data_type == "train":
-        rows_before_thinning = df.shape[0]
-        thinned_groups = []
-        for _, group in df.groupby('satellite_date', sort=False):  # group by date
-            thinned = thin_points(group, 50)                       # thin each group
-            thinned_groups.append(thinned)                         # add to thinned groups list
-        df = pd.concat(thinned_groups, ignore_index=True)          # turn back into df
-        print("rows removed due to spatial overlap:", rows_before_thinning - df.shape[0])
+    rows_before_thinning = df.shape[0]
+    thinned_groups = []
+    for _, group in df.groupby('satellite_date', sort=False):  # group by date
+        thinned = thin_points(group, 50)                       # thin each group
+        thinned_groups.append(thinned)                         # add to thinned groups list
+    df = pd.concat(thinned_groups, ignore_index=True)          # turn back into df
+    print("rows removed due to spatial overlap:", rows_before_thinning - df.shape[0])
 
     # replace missing values with nans
     df.replace(-999, np.nan, inplace=True)

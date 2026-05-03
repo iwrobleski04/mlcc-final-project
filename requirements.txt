@@ -1,0 +1,12 @@
+pandas
+numpy
+earthengine-api
+tqdm
+requests
+scikit-learn
+xgboost
+reverse_geocoder
+scipy
+seaborn
+matplotlib
+torch
