@@ -5,6 +5,7 @@ import time
 from tqdm import tqdm
 import requests
 import io
+from data_cleaning import load_clean_data
 
 def extract_satellite_data(feature):
     """
@@ -157,12 +158,14 @@ def match_caml_satellite():
     )  
     task.start()
 
-def get_wqp(satellite_df_path):
+def get_wqp(satellite_df_path, output_path):
     """
     match satellite images with wqp water nutrient data
     """
     # load data
-    df = pd.read_csv(satellite_df_path)
+    df = load_clean_data(satellite_df_path)
+    df = df[df["cloud_cover"] > 25]
+    print(df.shape)
 
     # round latitude and longitudes to 3 decimals (110m) 
     unique_locs = df[['latitude', 'longitude']].round(3).drop_duplicates()
@@ -206,7 +209,7 @@ def get_wqp(satellite_df_path):
     # if results found, turn results to csv 
     if results_list:
         nutrients = pd.concat(results_list, ignore_index=True)
-        nutrients.to_csv('nutrients.csv', index=False)
+        nutrients.to_csv(output_path, index=False)
 
     else:
         print("\nrequest successful, but no nutrients found in those specific boxes")
@@ -243,13 +246,13 @@ def normalize_units(row):
     # otherwise return none
     return None
 
-def match_wqp(existing_df_path, nutrient_df_path, date="sample"):
+def match_wqp(existing_df_path, nutrient_df_path, output_path):
     """
     match wqp nutrient data with dates in the existing dataset
     """
 
     # load data
-    df = pd.read_csv(existing_df_path)
+    df = load_clean_data(existing_df_path)
     nutrients = pd.read_csv(nutrient_df_path)
 
     # normalize nutrient units and drop missing rows
@@ -312,12 +315,8 @@ def match_wqp(existing_df_path, nutrient_df_path, date="sample"):
         how='left'
     )
 
-    if date == "satellite":
-        date_col = "satellite_date"
-        days_diff_col = "days_diff_sat_to_nutrients"
-    else:
-        date_col = "caml_sample_date"
-        days_diff_col = "days_diff_caml_to_nutrients"
+    date_col = "sample_date"
+    days_diff_col = "days_diff_caml_to_nutrients"
 
     # calculate time difference between nutrient sample and satellite
     merged[date_col] = pd.to_datetime(merged[date_col])
@@ -346,21 +345,21 @@ def match_wqp(existing_df_path, nutrient_df_path, date="sample"):
     )
 
     # save data
-    final_df.to_csv("data/nutrients_matchup_timeseries.csv", index=False)
+    final_df.to_csv(output_path, index=False)
 
-def match_nasa(existing_df_path):
+def match_nasa(existing_df_path, output_path):
     """
     match nasa weather data with dates and locations in the existing dataset
     """
 
     # load final matched dataframe
     df = pd.read_csv(existing_df_path)
-    df['caml_sample_date'] = pd.to_datetime(df['caml_sample_date'])
+    df['sample_date'] = pd.to_datetime(df['sample_date'])
 
     weather_results = []
 
     # iterate through unique location/date combos
-    unique_matchups = df[['latitude', 'longitude', 'caml_sample_date']].drop_duplicates()
+    unique_matchups = df[['latitude', 'longitude', 'sample_date']].drop_duplicates()
 
     print(f"fetching weather for {len(unique_matchups)} matchups...")
 
@@ -370,10 +369,10 @@ def match_nasa(existing_df_path):
         lat, lon = row['latitude'], row['longitude']
 
         # convert dates for nasa power
-        date_str = row['caml_sample_date'].strftime('%Y%m%d')
+        date_str = row['sample_date'].strftime('%Y%m%d')
         
         # create window 3 days before so we can calculate accumulated precipitation
-        start_date = (row['caml_sample_date'] - pd.Timedelta(days=3)).strftime('%Y%m%d')
+        start_date = (row['sample_date'] - pd.Timedelta(days=3)).strftime('%Y%m%d')
         
         url = f"https://power.larc.nasa.gov/api/temporal/daily/point"
         params = {
@@ -402,7 +401,7 @@ def match_nasa(existing_df_path):
                 
                 # add data to results
                 weather_results.append({
-                    'latitude': lat, 'longitude': lon, 'caml_sample_date': row['caml_sample_date'],
+                    'latitude': lat, 'longitude': lon, 'sample_date': row['sample_date'],
                     'precip_3d_mm': precip_3d,
                     'wind_speed_ms': wind,
                     'solar_rad_wm2': solar
@@ -418,9 +417,11 @@ def match_nasa(existing_df_path):
 
     # merge weather back into main dataframe
     weather_df = pd.DataFrame(weather_results)
-    df_final = pd.merge(df, weather_df, on=['latitude', 'longitude', 'caml_sample_date'], how='left')
-    df_final.to_csv('final_model_ready_data.csv', index=False)
+    df_final = pd.merge(df, weather_df, on=['latitude', 'longitude', 'sample_date'], how='left')
+    df_final.to_csv(output_path, index=False)
 
 if __name__ == "__main__":
     
-    match_caml_satellite()
+    # get_wqp("data/caml_satellite_matchup_5-3.csv")
+    # match_wqp("data/caml_satellite_matchup_5-3.csv", "data/nutrients_5-3.csv")
+    match_nasa("data/sat_nutrients_5-3.csv", "data/sat_nutrients_weather_5-3.csv")

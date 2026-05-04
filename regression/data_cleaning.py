@@ -78,11 +78,11 @@ def load_clean_data(path: str) -> pd.DataFrame:
     df['log_abundance'] = np.log10(df['cyanobacteria_abundance'] + 1)
 
     # turn dates into datetime objects
-    df["sample_date"] = pd.to_datetime(df["sample_date"], format="%Y-%m-%d", yearfirst=True)
+    df["caml_sample_date"] = pd.to_datetime(df["caml_sample_date"], format="%Y-%m-%d", yearfirst=True)
     df["satellite_date"] = pd.to_datetime(df["satellite_date"], format="%Y-%m-%d", yearfirst=True)
 
     # create column for difference in days between sample and sensor measurement
-    df["days_difference"] = (df["sample_date"] - df["satellite_date"]).dt.days.abs()
+    df["days_difference"] = (df["caml_sample_date"] - df["satellite_date"]).dt.days.abs()
 
     # encode sensor column and remove string sensor column
     df["is_s2"] = (df["sensor"]=="s2").astype(int)
@@ -93,6 +93,6 @@ def load_clean_data(path: str) -> pd.DataFrame:
 
 if __name__ == "__main__":
 
-    path = "data/caml_satellite_matchup.csv"
+    path = "data/caml_satellite_matchup_5-3.csv"
     df = load_clean_data(path)
-    df.to_csv("data/caml_satellite_matchup_clean.csv")
+    #df.to_csv("data/caml_satellite_matchup_clean.csv")
